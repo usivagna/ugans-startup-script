@@ -248,7 +248,12 @@ $widgetsResult3 = Set-RegistryValue -Path $feedsPath `
 # If widgets registry keys failed, inform user of manual steps
 if (-not ($widgetsResult1 -and $widgetsResult2 -and $widgetsResult3)) {
     Write-Host ""
-    Write-Host "  [INFO] Some widgets settings may be protected by Windows." -ForegroundColor Yellow
+    Write-Host "  [WARNING] Some widgets settings may be protected by Windows 11." -ForegroundColor Yellow
+    Write-Host "  [INFO] Why this happens:" -ForegroundColor Yellow
+    Write-Host "        - Windows 11 may revert the TaskbarDa value after Explorer restart" -ForegroundColor Gray
+    Write-Host "        - Some registry keys are protected by TrustedInstaller" -ForegroundColor Gray
+    Write-Host "        - Group Policy or MDM settings may override user preferences" -ForegroundColor Gray
+    Write-Host ""
     Write-Host "  [INFO] To manually disable widgets:" -ForegroundColor Yellow
     Write-Host "        1. Right-click on the taskbar" -ForegroundColor Gray
     Write-Host "        2. Select 'Taskbar settings'" -ForegroundColor Gray
@@ -257,9 +262,11 @@ if (-not ($widgetsResult1 -and $widgetsResult2 -and $widgetsResult3)) {
 }
 
 # Hide Clock/Date from System Tray
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
-    -Name "ShowClock" -Value 0 -Description "Hide Clock from System Tray"
+# The correct way is to use explorer policies or modify the system tray directly
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" `
+    -Name "Settings" -Value 0 -Type Binary -Description "Modify Taskbar Settings" -ErrorAction SilentlyContinue
 
+# Use Group Policy method to hide clock
 Set-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" `
     -Name "HideClock" -Value 1 -Description "Hide Clock/Date from Taskbar via Policy"
 
@@ -285,8 +292,17 @@ Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Content
     -Name "RotatingLockScreenOverlayEnabled" -Value 1 -Description "Enable Lock Screen Overlay"
 
 # Enable Windows Spotlight on Desktop (Windows 11)
+# Method 1: Enable Spotlight as desktop background
 Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Wallpapers" `
-    -Name "BackgroundType" -Value 2 -Description "Enable Windows Spotlight on Desktop"
+    -Name "BackgroundType" -Value 2 -Description "Enable Windows Spotlight Background Type"
+
+# Method 2: Disable Windows Spotlight Collection restriction
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudExperienceHost\Intent\SpotlightOnDesktop" `
+    -Name "Value" -Value 1 -Description "Enable Spotlight on Desktop Intent"
+
+# Method 3: Enable via Personalization
+Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
+    -Name "DesktopSlideShow" -Value 0 -Description "Disable Slideshow for Spotlight"
 
 # Set Dark Theme for Apps
 Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
@@ -373,6 +389,11 @@ $software = @(
     @{
         Name = "PowerToys"
         Id = "Microsoft.PowerToys"
+        Scope = "user"
+    },
+    @{
+        Name = "Spotify"
+        Id = "Spotify.Spotify"
         Scope = "user"
     }
 )
