@@ -34,7 +34,14 @@ Param(
 
 $ErrorActionPreference = "Continue"
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$logFile = Join-Path $PSScriptRoot "setup-log-$timestamp.txt"
+
+# Create output folder for logs and backups
+$outputFolder = Join-Path $PSScriptRoot "output"
+if (-not (Test-Path $outputFolder)) {
+    New-Item -Path $outputFolder -ItemType Directory -Force | Out-Null
+}
+
+$logFile = Join-Path $outputFolder "setup-log-$timestamp.txt"
 
 # Start transcript logging
 Start-Transcript -Path $logFile -Append
@@ -115,7 +122,7 @@ if ($CreateRestorePoint) {
 Write-Host "[4/6] Configuring Windows 11 settings..." -ForegroundColor Yellow
 
 # Backup registry
-$backupFile = Join-Path $PSScriptRoot "registry-backup-$timestamp.reg"
+$backupFile = Join-Path $outputFolder "registry-backup-$timestamp.reg"
 Write-Host "Creating registry backup: $backupFile" -ForegroundColor Gray
 
 try {
@@ -179,12 +186,48 @@ function Set-RegistryValue {
     }
 }
 
-# Disable Widgets Icon on Taskbar
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
-    -Name "TaskbarDa" -Value 0 -Description "Disable Widgets Icon on Taskbar"
+# Special handling for Widgets (TaskbarDa) - try taking ownership if needed
+Write-Host "  [INFO] Configuring Widgets setting..." -ForegroundColor Gray
+$taskbarDaPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+$widgetsResult1 = $false
 
-# Also disable via Shell Feeds
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" `
+try {
+    # Ensure the registry key exists
+    if (-not (Test-Path $taskbarDaPath)) {
+        New-Item -Path $taskbarDaPath -Force | Out-Null
+        Write-Host "  [INFO] Created Explorer\Advanced registry key" -ForegroundColor Gray
+    }
+    
+    # First attempt: Direct registry modification
+    $currentValue = Get-ItemProperty -Path $taskbarDaPath -Name "TaskbarDa" -ErrorAction SilentlyContinue
+    if ($null -ne $currentValue) {
+        Set-ItemProperty -Path $taskbarDaPath -Name "TaskbarDa" -Value 0 -Type DWord -Force -ErrorAction Stop
+        Write-Host "  [OK] Disable Widgets Icon on Taskbar" -ForegroundColor Green
+        $widgetsResult1 = $true
+    } else {
+        New-ItemProperty -Path $taskbarDaPath -Name "TaskbarDa" -Value 0 -PropertyType DWord -Force -ErrorAction Stop
+        Write-Host "  [OK] Disable Widgets Icon on Taskbar" -ForegroundColor Green
+        $widgetsResult1 = $true
+    }
+}
+catch {
+    # Second attempt: Use reg.exe with full path
+    $result = & reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v TaskbarDa /t REG_DWORD /d 0 /f 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  [OK] Disable Widgets Icon on Taskbar (via reg.exe)" -ForegroundColor Green
+        $widgetsResult1 = $true
+    } else {
+        Write-Host "  [FAILED] Disable Widgets Icon on Taskbar - Protected by system" -ForegroundColor Red
+    }
+}
+
+# Also disable via Shell Feeds - ensure key exists
+$feedsPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds"
+if (-not (Test-Path $feedsPath)) {
+    New-Item -Path $feedsPath -Force | Out-Null
+    Write-Host "  [INFO] Created Feeds registry key" -ForegroundColor Gray
+}
+$widgetsResult2 = Set-RegistryValue -Path $feedsPath `
     -Name "IsFeedsAvailable" -Value 0 -Description "Disable Feeds Availability"
 
 # Hide Search Box from Taskbar
@@ -196,8 +239,22 @@ Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explore
     -Name "ShowTaskViewButton" -Value 0 -Description "Hide Task View Button"
 
 # Disable Feed in Widgets Panel
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds" `
+if (-not (Test-Path $feedsPath)) {
+    New-Item -Path $feedsPath -Force | Out-Null
+}
+$widgetsResult3 = Set-RegistryValue -Path $feedsPath `
     -Name "ShellFeedsTaskbarViewMode" -Value 2 -Description "Disable Feed in Widgets Panel"
+
+# If widgets registry keys failed, inform user of manual steps
+if (-not ($widgetsResult1 -and $widgetsResult2 -and $widgetsResult3)) {
+    Write-Host ""
+    Write-Host "  [INFO] Some widgets settings may be protected by Windows." -ForegroundColor Yellow
+    Write-Host "  [INFO] To manually disable widgets:" -ForegroundColor Yellow
+    Write-Host "        1. Right-click on the taskbar" -ForegroundColor Gray
+    Write-Host "        2. Select 'Taskbar settings'" -ForegroundColor Gray
+    Write-Host "        3. Turn off 'Widgets' under Taskbar items" -ForegroundColor Gray
+    Write-Host ""
+}
 
 # Hide Clock/Date from System Tray
 Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
@@ -205,6 +262,16 @@ Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explore
 
 Set-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" `
     -Name "HideClock" -Value 1 -Description "Hide Clock/Date from Taskbar via Policy"
+
+# Show Time in Notification Center (Action Center)
+# Ensure the registry key exists
+$notificationSettingsPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings"
+if (-not (Test-Path $notificationSettingsPath)) {
+    New-Item -Path $notificationSettingsPath -Force | Out-Null
+    Write-Host "  [INFO] Created Notifications\Settings registry key" -ForegroundColor Gray
+}
+Set-RegistryValue -Path $notificationSettingsPath `
+    -Name "ShowClock" -Value 1 -Description "Show Time in Notification Center"
 
 # Turn off Widgets on Lock Screen
 Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
