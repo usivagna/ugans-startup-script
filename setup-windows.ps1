@@ -414,7 +414,7 @@ foreach ($app in $software) {
         Write-Host "  [INFO] Installing $($app.Name)..." -ForegroundColor Yellow
         
         try {
-            $installArgs = @("install", "--id", $app.Id, "--silent", "--accept-package-agreements", "--accept-source-agreements")
+            $installArgs = @("install", "--id", $app.Id, "--source", "winget", "--silent", "--accept-package-agreements", "--accept-source-agreements")
             
             if ($app.Scope -eq "user") {
                 $installArgs += "--scope"
