@@ -396,6 +396,7 @@ $software = @(
         Name = "Spotify"
         Id = "Spotify.Spotify"
         Scope = "user"
+        ElevationProhibited = $true  # Spotify installer cannot run as admin
     },
     @{
         Name = "GitHub Copilot CLI"
@@ -437,15 +438,74 @@ foreach ($app in $software) {
                 $installArgs += "user"
             }
             
-            $process = Start-Process -FilePath "winget" -ArgumentList $installArgs -Wait -PassThru -NoNewWindow
-            
-            if ($process.ExitCode -eq 0) {
-                Write-Host "  [OK] $($app.Name) installed successfully" -ForegroundColor Green
-                $installResults += @{ Name = $app.Name; Status = "Installed"; Success = $true }
+            # Special handling for apps that prohibit elevation (e.g., Spotify)
+            if ($app.ElevationProhibited -eq $true) {
+                Write-Host "  [INFO] $($app.Name) requires non-elevated installation" -ForegroundColor Gray
+                
+                # Create a scheduled task to run winget as current user (non-elevated)
+                $taskName = "WingetInstall_$($app.Id -replace '\.', '_')"
+                $wingetPath = (Get-Command winget).Source
+                $argumentList = $installArgs -join " "
+                
+                # Create task action
+                $action = New-ScheduledTaskAction -Execute $wingetPath -Argument $argumentList
+                
+                # Create task principal (run as current user without elevation)
+                $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+                
+                # Create task settings
+                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+                
+                # Register and run the task
+                Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+                Start-ScheduledTask -TaskName $taskName
+                
+                # Wait for the task to complete (with timeout)
+                $timeout = 300  # 5 minutes
+                $elapsed = 0
+                $checkInterval = 2
+                
+                while ($elapsed -lt $timeout) {
+                    Start-Sleep -Seconds $checkInterval
+                    $elapsed += $checkInterval
+                    
+                    $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+                    if ($taskInfo.LastTaskResult -ne 267009) {  # 267009 means task is running
+                        break
+                    }
+                }
+                
+                # Get task result
+                $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+                
+                # Clean up task
+                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+                
+                # Check if installation succeeded by querying winget again
+                Start-Sleep -Seconds 2
+                $checkAfterInstall = winget list --id $app.Id 2>&1 | Out-String
+                
+                if ($checkAfterInstall -match $app.Id) {
+                    Write-Host "  [OK] $($app.Name) installed successfully" -ForegroundColor Green
+                    $installResults += @{ Name = $app.Name; Status = "Installed"; Success = $true }
+                }
+                else {
+                    Write-Host "  [FAILED] $($app.Name) installation failed" -ForegroundColor Red
+                    $installResults += @{ Name = $app.Name; Status = "Failed"; Success = $false }
+                }
             }
             else {
-                Write-Host "  [FAILED] $($app.Name) installation failed (Exit code: $($process.ExitCode))" -ForegroundColor Red
-                $installResults += @{ Name = $app.Name; Status = "Failed"; Success = $false }
+                # Normal elevated installation
+                $process = Start-Process -FilePath "winget" -ArgumentList $installArgs -Wait -PassThru -NoNewWindow
+                
+                if ($process.ExitCode -eq 0) {
+                    Write-Host "  [OK] $($app.Name) installed successfully" -ForegroundColor Green
+                    $installResults += @{ Name = $app.Name; Status = "Installed"; Success = $true }
+                }
+                else {
+                    Write-Host "  [FAILED] $($app.Name) installation failed (Exit code: $($process.ExitCode))" -ForegroundColor Red
+                    $installResults += @{ Name = $app.Name; Status = "Failed"; Success = $false }
+                }
             }
         }
         catch {
