@@ -476,9 +476,6 @@ foreach ($app in $software) {
                     }
                 }
                 
-                # Get task result
-                $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
-                
                 # Clean up task
                 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
                 
