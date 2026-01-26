@@ -464,13 +464,14 @@ foreach ($app in $software) {
                 $timeout = 300  # 5 minutes
                 $elapsed = 0
                 $checkInterval = 2
+                $SCHED_S_TASK_RUNNING = 267009  # Task is currently running
                 
                 while ($elapsed -lt $timeout) {
                     Start-Sleep -Seconds $checkInterval
                     $elapsed += $checkInterval
                     
                     $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
-                    if ($taskInfo.LastTaskResult -ne 267009) {  # 267009 means task is running
+                    if ($taskInfo -and $taskInfo.LastTaskResult -ne $SCHED_S_TASK_RUNNING) {
                         break
                     }
                 }
