@@ -4,7 +4,7 @@
 #
 # Configures Windows 11 settings including taskbar customization, dark theme,
 # Windows Spotlight, and installs essential developer software (Microsoft 365,
-# VSCode, Git, Node.js (includes npm and npx), PowerToys, Logi Options+, 
+# VSCode, Git, Node.js (includes npm and npx), PowerToys, Logi Options+,
 # Spotify, GitHub Copilot CLI, Claude Code, Microsoft Foundry Local) using winget.
 #
 # PARAMETER CreateRestorePoint
