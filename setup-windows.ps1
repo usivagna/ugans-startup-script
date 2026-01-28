@@ -550,59 +550,71 @@ Write-Host ""
 
 Write-Host "Configuring Windows Terminal settings:" -ForegroundColor Gray
 
+$wtConfigured = $false
+
 try {
-    # Determine Windows Terminal settings path
-    $wtSettingsPath = $null
-    $possiblePaths = @(
-        "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
-        "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json",
-        "$env:LOCALAPPDATA\Microsoft\Windows Terminal\settings.json"
-    )
-    
-    foreach ($path in $possiblePaths) {
-        if (Test-Path $path) {
-            $wtSettingsPath = $path
-            break
-        }
-    }
-    
-    if ($null -eq $wtSettingsPath) {
-        # Try to create the directory for standard install
-        $wtDir = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState"
-        if (-not (Test-Path $wtDir)) {
-            # Windows Terminal might not be installed yet or not run for the first time
-            Write-Host "  [INFO] Windows Terminal settings directory not found" -ForegroundColor Yellow
-            Write-Host "  [INFO] Settings will be applied when Windows Terminal is first launched" -ForegroundColor Yellow
-        }
-        else {
-            $wtSettingsPath = Join-Path $wtDir "settings.json"
-        }
-    }
-    
-    if ($null -ne $wtSettingsPath -and (Test-Path (Split-Path $wtSettingsPath))) {
-        # Backup existing settings if they exist
-        if (Test-Path $wtSettingsPath) {
-            $backupPath = Join-Path $outputFolder "windows-terminal-settings-backup-$timestamp.json"
-            Copy-Item -Path $wtSettingsPath -Destination $backupPath -Force
-            Write-Host "  [OK] Backed up existing Windows Terminal settings to: $backupPath" -ForegroundColor Green
-        }
-        
-        # Copy new settings from template
-        $templatePath = Join-Path $PSScriptRoot "windows-terminal-settings.json"
-        if (Test-Path $templatePath) {
-            Copy-Item -Path $templatePath -Destination $wtSettingsPath -Force
-            Write-Host "  [OK] Windows Terminal settings applied successfully" -ForegroundColor Green
-        }
-        else {
-            Write-Host "  [WARNING] Windows Terminal settings template not found at: $templatePath" -ForegroundColor Yellow
-        }
+    # First check if Windows Terminal was just installed
+    $wtInstallResult = $installResults | Where-Object { $_.Name -eq "Windows Terminal" }
+    if ($wtInstallResult -and $wtInstallResult.Status -eq "Installed") {
+        Write-Host "  [INFO] Windows Terminal was just installed. Settings will be applied on first launch." -ForegroundColor Yellow
+        Write-Host "  [INFO] You may need to launch Windows Terminal once and re-run this script to apply settings." -ForegroundColor Yellow
+        $wtConfigured = $false
     }
     else {
-        Write-Host "  [INFO] Windows Terminal not yet configured (may need to launch it first)" -ForegroundColor Yellow
+        # Determine Windows Terminal settings path
+        $wtSettingsPath = $null
+        $possiblePaths = @(
+            "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json",
+            "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json",
+            "$env:LOCALAPPDATA\Microsoft\Windows Terminal\settings.json"
+        )
+        
+        foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+                $wtSettingsPath = $path
+                break
+            }
+        }
+        
+        if ($null -eq $wtSettingsPath) {
+            # Try to create the directory for standard install
+            $wtDir = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState"
+            if (-not (Test-Path $wtDir)) {
+                # Windows Terminal might not be installed yet or not run for the first time
+                Write-Host "  [INFO] Windows Terminal settings directory not found" -ForegroundColor Yellow
+                Write-Host "  [INFO] Settings will be applied when Windows Terminal is first launched" -ForegroundColor Yellow
+                $wtConfigured = $false
+            }
+            else {
+                $wtSettingsPath = Join-Path $wtDir "settings.json"
+            }
+        }
+        
+        if ($null -ne $wtSettingsPath -and (Test-Path (Split-Path $wtSettingsPath))) {
+            # Backup existing settings if they exist
+            if (Test-Path $wtSettingsPath) {
+                $backupPath = Join-Path $outputFolder "windows-terminal-settings-backup-$timestamp.json"
+                Copy-Item -Path $wtSettingsPath -Destination $backupPath -Force
+                Write-Host "  [OK] Backed up existing Windows Terminal settings to: $backupPath" -ForegroundColor Green
+            }
+            
+            # Copy new settings from template
+            $templatePath = Join-Path $PSScriptRoot "windows-terminal-settings.json"
+            if (Test-Path $templatePath) {
+                Copy-Item -Path $templatePath -Destination $wtSettingsPath -Force
+                Write-Host "  [OK] Windows Terminal settings applied successfully" -ForegroundColor Green
+                $wtConfigured = $true
+            }
+            else {
+                Write-Host "  [WARNING] Windows Terminal settings template not found at: $templatePath" -ForegroundColor Yellow
+                $wtConfigured = $false
+            }
+        }
     }
 }
 catch {
     Write-Host "  [WARNING] Could not configure Windows Terminal: $($_.Exception.Message)" -ForegroundColor Yellow
+    $wtConfigured = $false
 }
 
 Write-Host ""
@@ -621,7 +633,12 @@ Write-Host "  [OK] Clock/Date hidden from taskbar (visible in Action Center)" -F
 Write-Host "  [OK] Taskbar apps unpinned" -ForegroundColor Green
 Write-Host "  [OK] Dark theme enabled" -ForegroundColor Green
 Write-Host "  [OK] Windows Spotlight enabled" -ForegroundColor Green
-Write-Host "  [OK] Windows Terminal configured" -ForegroundColor Green
+if ($wtConfigured) {
+    Write-Host "  [OK] Windows Terminal configured" -ForegroundColor Green
+}
+else {
+    Write-Host "  [INFO] Windows Terminal settings ready (launch Terminal and re-run if needed)" -ForegroundColor Yellow
+}
 Write-Host ""
 
 Write-Host "Software Installation Status:" -ForegroundColor Cyan
