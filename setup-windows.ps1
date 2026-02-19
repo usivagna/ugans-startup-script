@@ -5,7 +5,8 @@
 # Configures Windows 11 settings including taskbar customization, dark theme,
 # Windows Spotlight, and installs essential developer software (Microsoft 365,
 # VSCode, Git, Node.js (includes npm and npx), PowerToys, Logi Options+,
-# Spotify, GitHub Copilot CLI, Claude Code, Microsoft Foundry Local) using winget.
+# Spotify, GitHub Copilot CLI, Claude Code, Microsoft Foundry Local, Handy)
+# using winget.
 #
 # PARAMETER CreateRestorePoint
 #   Optional. Creates a system restore point before making changes.
@@ -421,6 +422,11 @@ $software = @(
     @{
         Name = "Microsoft Foundry Local"
         Id = "Microsoft.FoundryLocal"
+        Scope = "user"
+    },
+    @{
+        Name = "Handy"
+        Id = "cjpais.Handy"
         Scope = "user"
     }
 )
