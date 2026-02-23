@@ -402,6 +402,7 @@ $software = @(
         Name = "Logi Options+"
         Id = "Logitech.OptionsPlus"
         Scope = "user"
+        ElevationProhibited = $true  # Logi Options+ installer cannot run as admin
     },
     @{
         Name = "Spotify"
