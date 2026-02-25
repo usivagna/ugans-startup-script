@@ -3,7 +3,8 @@
 # Automates Windows 11 PC setup for developers.
 #
 # Configures Windows 11 settings including taskbar customization, dark theme,
-# Windows Spotlight, and installs essential developer software (Microsoft 365,
+# Windows Spotlight, uninstalls the Windows Web Experience Pack (Widgets), and
+# installs essential developer software (Microsoft 365,
 # VSCode, Git, Node.js (includes npm and npx), PowerToys, Logi Options+,
 # Spotify, GitHub Copilot CLI, Claude Code, Microsoft Foundry Local, Handy)
 # using winget.
@@ -371,6 +372,22 @@ catch {
     exit 1
 }
 
+# Uninstall Windows Web Experience Pack (Widgets)
+Write-Host "Uninstalling Windows Web Experience Pack (Widgets)..." -ForegroundColor Gray
+
+$uninstallProcess = Start-Process -FilePath "winget" -ArgumentList @(
+    "uninstall", "Windows web experience Pack",
+    "--silent", "--accept-source-agreements"
+) -Wait -PassThru -NoNewWindow
+
+if ($uninstallProcess.ExitCode -eq 0) {
+    Write-Host "  [OK] Windows Web Experience Pack (Widgets) uninstalled successfully" -ForegroundColor Green
+} else {
+    Write-Host "  [INFO] Windows Web Experience Pack may already be removed or is not present (Exit code: $($uninstallProcess.ExitCode))" -ForegroundColor Yellow
+}
+
+Write-Host ""
+
 # Software to install
 $software = @(
     @{
@@ -553,6 +570,7 @@ Write-Host ""
 
 Write-Host "Configuration Status:" -ForegroundColor Cyan
 Write-Host "  [OK] Windows 11 settings configured" -ForegroundColor Green
+Write-Host "  [OK] Windows Web Experience Pack (Widgets) uninstalled" -ForegroundColor Green
 Write-Host "  [OK] Taskbar customized (widgets, search, task view hidden)" -ForegroundColor Green
 Write-Host "  [OK] Clock/Date hidden from taskbar (visible in Action Center)" -ForegroundColor Green
 Write-Host "  [OK] Taskbar apps unpinned" -ForegroundColor Green
