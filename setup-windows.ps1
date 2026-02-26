@@ -411,6 +411,11 @@ $software = @(
         Scope = "user"
     },
     @{
+        Name = "Python 3 (latest stable)"
+        Id = "Python.Python.3"
+        Scope = "user"
+    },
+    @{
         Name = "PowerToys"
         Id = "Microsoft.PowerToys"
         Scope = "user"

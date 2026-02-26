@@ -18,6 +18,7 @@ Automated Windows 11 developer PC setup script that configures system settings a
 | Visual Studio Code | `Microsoft.VisualStudioCode` |
 | Git | `Git.Git` |
 | Node.js LTS (includes npm and npx) | `OpenJS.NodeJS.LTS` |
+| Python 3 (latest stable) | `Python.Python.3` |
 | PowerToys | `Microsoft.PowerToys` |
 | Logi Options+ | `Logitech.OptionsPlus` |
 | Spotify | `Spotify.Spotify` |
