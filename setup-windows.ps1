@@ -451,6 +451,11 @@ $software = @(
         Name = "Handy"
         Id = "cjpais.Handy"
         Scope = "user"
+    },
+    @{
+        Name = "PowerShell 7"
+        Id = "Microsoft.PowerShell"
+        Scope = "machine"
     }
 )
 
