@@ -26,6 +26,7 @@ Automated Windows 11 developer PC setup script that configures system settings a
 | Claude Code | `Anthropic.ClaudeCode` |
 | Microsoft Foundry Local | `Microsoft.FoundryLocal` |
 | Handy | `cjpais.Handy` |
+| PowerShell 7 | `Microsoft.PowerShell` |
 
 ## Requirements
 
