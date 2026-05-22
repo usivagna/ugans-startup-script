@@ -413,7 +413,7 @@ $software = @(
     },
     @{
         Name = "Python 3 (latest stable)"
-        Id = "Python.Python.3"
+        Id = "Python.Python.3.13"
         Scope = "user"
     },
     @{
@@ -452,6 +452,7 @@ $software = @(
         Name = "Handy"
         Id = "cjpais.Handy"
         Scope = "user"
+        PreInstall = @("KhronosGroup.VulkanRT", "Microsoft.VCRedist.2015+.arm64")
     },
     @{
         Name = "PowerShell 7"
@@ -464,6 +465,22 @@ $installResults = @()
 
 foreach ($app in $software) {
     Write-Host "Checking $($app.Name)..." -ForegroundColor Gray
+    
+    # Pre-install any declared dependencies before the main package
+    if ($app.PreInstall) {
+        foreach ($depId in $app.PreInstall) {
+            $depCheck = winget list --id $depId 2>&1 | Out-String
+            if (-not ($depCheck -match [regex]::Escape($depId))) {
+                Write-Host "  [INFO] Pre-installing dependency: $depId" -ForegroundColor Gray
+                $depArgs = @("install", "--id", $depId, "--source", "winget", "--silent",
+                             "--accept-package-agreements", "--accept-source-agreements")
+                $depProcess = Start-Process -FilePath "winget" -ArgumentList $depArgs -Wait -PassThru -NoNewWindow
+                if ($depProcess.ExitCode -ne 0) {
+                    Write-Host "  [WARNING] Dependency $depId could not be installed (Exit code: $($depProcess.ExitCode)). Proceeding anyway..." -ForegroundColor Yellow
+                }
+            }
+        }
+    }
     
     # Check if already installed
     $checkInstalled = winget list --id $app.Id 2>&1 | Out-String
@@ -505,18 +522,27 @@ foreach ($app in $software) {
                 Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
                 Start-ScheduledTask -TaskName $taskName
                 
+                # Wait for the task to start running (up to 30 seconds)
+                $startTimeout = 30
+                $startElapsed = 0
+                while ($startElapsed -lt $startTimeout) {
+                    Start-Sleep -Seconds 2
+                    $startElapsed += 2
+                    $taskState = (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue).State
+                    if ($taskState -eq "Running") { break }
+                }
+                
                 # Wait for the task to complete (with timeout)
                 $timeout = 300  # 5 minutes
                 $elapsed = 0
-                $checkInterval = 2
-                $SCHED_S_TASK_RUNNING = 267009  # Task is currently running
+                $checkInterval = 3  # Poll every 3 seconds to balance responsiveness and CPU usage
                 
                 while ($elapsed -lt $timeout) {
                     Start-Sleep -Seconds $checkInterval
                     $elapsed += $checkInterval
                     
-                    $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
-                    if ($taskInfo -and $taskInfo.LastTaskResult -ne $SCHED_S_TASK_RUNNING) {
+                    $taskState = (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue).State
+                    if ($taskState -ne "Running") {
                         break
                     }
                 }
