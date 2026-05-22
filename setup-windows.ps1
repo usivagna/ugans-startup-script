@@ -390,10 +390,40 @@ function Invoke-Winget {
 function ConvertTo-CommandLineArgument {
     param([Parameter(Mandatory=$true)][string]$Value)
 
-    if ($Value -match '[\s"]') {
-        return '"' + $Value.Replace('"', '\"') + '"'
-   }
-    return $Value
+    if ($Value -ne "" -and $Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    $quoted = [System.Text.StringBuilder]::new()
+    [void]$quoted.Append('"')
+    $backslashCount = 0
+
+    foreach ($character in $Value.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashCount++
+            continue
+        }
+
+        if ($character -eq '"') {
+            [void]$quoted.Append('\' * (($backslashCount * 2) + 1))
+            [void]$quoted.Append('"')
+            $backslashCount = 0
+            continue
+        }
+
+        if ($backslashCount -gt 0) {
+            [void]$quoted.Append('\' * $backslashCount)
+            $backslashCount = 0
+        }
+        [void]$quoted.Append($character)
+    }
+
+    if ($backslashCount -gt 0) {
+        [void]$quoted.Append('\' * ($backslashCount * 2))
+    }
+
+    [void]$quoted.Append('"')
+    return $quoted.ToString()
 }
 
 $osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
