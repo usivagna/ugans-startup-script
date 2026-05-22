@@ -18,7 +18,7 @@ Automated Windows 11 developer PC setup script that configures system settings a
 | Visual Studio Code | `Microsoft.VisualStudioCode` |
 | Git | `Git.Git` |
 | Node.js LTS (includes npm and npx) | `OpenJS.NodeJS.LTS` |
-| Python 3 (latest stable) | `Python.Python.3` |
+| Python 3.13 | `Python.Python.3.13` |
 | PowerToys | `Microsoft.PowerToys` |
 | Logi Options+ | `Logitech.OptionsPlus` |
 | Spotify | `Spotify.Spotify` |
@@ -54,4 +54,5 @@ Logs and registry backups are saved to the `output/` folder created next to the 
 ## Notes
 
 - Spotify requires a non-elevated install; the script handles this automatically via a scheduled task.
+- Handy is skipped on Windows ARM64 because its winget dependency chain currently lacks suitable ARM64 installers.
 - Restart your computer after the script finishes to ensure all changes take effect.

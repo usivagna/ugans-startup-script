@@ -240,11 +240,11 @@ $widgetsResult3 = Set-RegistryValue -Path $feedsPath `
     -Name "IsFeedsAvailable" -Value 0 -Description "Disable Feeds Availability"
 
 # Hide Search Box from Taskbar
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" `
     -Name "SearchboxTaskbarMode" -Value 0 -Description "Hide Search Box from Taskbar"
 
 # Hide Task View Button
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
     -Name "ShowTaskViewButton" -Value 0 -Description "Hide Task View Button"
 
 # Disable Feed in Widgets Panel
@@ -267,11 +267,11 @@ if (-not ($widgetsResult1 -and $widgetsResult2)) {
 
 # Hide Clock/Date from System Tray
 # The correct way is to use explorer policies or modify the system tray directly
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" `
     -Name "Settings" -Value 0 -Type Binary -Description "Modify Taskbar Settings" -ErrorAction SilentlyContinue
 
 # Use Group Policy method to hide clock
-Set-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer" `
     -Name "HideClock" -Value 1 -Description "Hide Clock/Date from Taskbar via Policy"
 
 # Show Time in Notification Center (Action Center)
@@ -281,39 +281,39 @@ if (-not (Test-Path $notificationSettingsPath)) {
     New-Item -Path $notificationSettingsPath -Force | Out-Null
     Write-Host "  [INFO] Created Notifications\Settings registry key" -ForegroundColor Gray
 }
-Set-RegistryValue -Path $notificationSettingsPath `
+$null = Set-RegistryValue -Path $notificationSettingsPath `
     -Name "ShowClock" -Value 1 -Description "Show Time in Notification Center"
 
 # Turn off Widgets on Lock Screen
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
     -Name "SubscribedContent-338387Enabled" -Value 0 -Description "Turn off Widgets on Lock Screen"
 
 # Enable Windows Spotlight on Lock Screen
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
     -Name "RotatingLockScreenEnabled" -Value 1 -Description "Enable Windows Spotlight on Lock Screen"
 
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
     -Name "RotatingLockScreenOverlayEnabled" -Value 1 -Description "Enable Lock Screen Overlay"
 
 # Enable Windows Spotlight on Desktop (Windows 11)
 # Method 1: Enable Spotlight as desktop background
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Wallpapers" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Wallpapers" `
     -Name "BackgroundType" -Value 2 -Description "Enable Windows Spotlight Background Type"
 
 # Method 2: Disable Windows Spotlight Collection restriction
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudExperienceHost\Intent\SpotlightOnDesktop" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudExperienceHost\Intent\SpotlightOnDesktop" `
     -Name "Value" -Value 1 -Description "Enable Spotlight on Desktop Intent"
 
 # Method 3: Enable via Personalization
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
     -Name "DesktopSlideShow" -Value 0 -Description "Disable Slideshow for Spotlight"
 
 # Set Dark Theme for Apps
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
     -Name "AppsUseLightTheme" -Value 0 -Description "Set Dark Theme for Apps"
 
 # Set Dark Theme for System
-Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
+$null = Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
     -Name "SystemUsesLightTheme" -Value 0 -Description "Set Dark Theme for System"
 
 Write-Host ""
@@ -373,18 +373,43 @@ catch {
     exit 1
 }
 
+function Test-WingetPackageInstalled {
+    param([Parameter(Mandatory=$true)][string]$Id)
+
+    $output = & winget list --id $Id --exact 2>&1 | Out-String
+    return ($LASTEXITCODE -eq 0 -and $output -match [regex]::Escape($Id))
+}
+
+function Invoke-Winget {
+    param([Parameter(Mandatory=$true)][string[]]$Arguments)
+
+    & winget @Arguments
+    return $LASTEXITCODE
+}
+
+function ConvertTo-CommandLineArgument {
+    param([Parameter(Mandatory=$true)][string]$Value)
+
+    if ($Value -match '[\s"]') {
+        return '"' + $Value.Replace('"', '\"') + '"'
+   }
+    return $Value
+}
+
+$osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+
 # Uninstall Windows Web Experience Pack (Widgets)
 Write-Host "Uninstalling Windows Web Experience Pack (Widgets)..." -ForegroundColor Gray
 
-$uninstallProcess = Start-Process -FilePath "winget" -ArgumentList @(
-    "uninstall", "Windows web experience Pack",
-    "--silent", "--accept-source-agreements"
-) -Wait -PassThru -NoNewWindow
+$webExperienceExitCode = Invoke-Winget -Arguments @(
+    "uninstall", "--id", "MicrosoftWindows.Client.WebExperience",
+    "--exact", "--silent", "--accept-source-agreements"
+)
 
-if ($uninstallProcess.ExitCode -eq 0) {
+if ($webExperienceExitCode -eq 0) {
     Write-Host "  [OK] Windows Web Experience Pack (Widgets) uninstalled successfully" -ForegroundColor Green
 } else {
-    Write-Host "  [INFO] Windows Web Experience Pack may already be removed or is not present (Exit code: $($uninstallProcess.ExitCode))" -ForegroundColor Yellow
+    Write-Host "  [INFO] Windows Web Experience Pack may already be removed or is not present (Exit code: $webExperienceExitCode)" -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -412,8 +437,8 @@ $software = @(
         Scope = "user"
     },
     @{
-        Name = "Python 3 (latest stable)"
-        Id = "Python.Python.3"
+        Name = "Python 3.13"
+        Id = "Python.Python.3.13"
         Scope = "user"
     },
     @{
@@ -452,6 +477,8 @@ $software = @(
         Name = "Handy"
         Id = "cjpais.Handy"
         Scope = "user"
+        SkipOnArm64 = $true
+        SkipReason = "Handy winget dependencies currently do not provide suitable ARM64 installers"
     },
     @{
         Name = "PowerShell 7"
@@ -464,11 +491,16 @@ $installResults = @()
 
 foreach ($app in $software) {
     Write-Host "Checking $($app.Name)..." -ForegroundColor Gray
+
+    if ($app.SkipOnArm64 -eq $true -and $osArchitecture -eq "Arm64") {
+        Write-Host "  [SKIPPED] $($app.Name) skipped on ARM64 - $($app.SkipReason)" -ForegroundColor Yellow
+        $installResults += @{ Name = $app.Name; Status = "Skipped on ARM64"; Success = $true }
+        Write-Host ""
+        continue
+    }
     
     # Check if already installed
-    $checkInstalled = winget list --id $app.Id 2>&1 | Out-String
-    
-    if ($checkInstalled -match $app.Id) {
+    if (Test-WingetPackageInstalled -Id $app.Id) {
         Write-Host "  [OK] $($app.Name) is already installed" -ForegroundColor Green
         $installResults += @{ Name = $app.Name; Status = "Already Installed"; Success = $true }
     }
@@ -490,13 +522,14 @@ foreach ($app in $software) {
                 # Create a scheduled task to run winget as current user (non-elevated)
                 $taskName = "WingetInstall_$($app.Id -replace '\.', '_')"
                 $wingetPath = (Get-Command winget).Source
-                $argumentList = $installArgs -join " "
+                $argumentList = ($installArgs | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " "
                 
                 # Create task action
                 $action = New-ScheduledTaskAction -Execute $wingetPath -Argument $argumentList
                 
                 # Create task principal (run as current user without elevation)
-                $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+                $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+                $principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive
                 
                 # Create task settings
                 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
@@ -522,31 +555,30 @@ foreach ($app in $software) {
                 }
                 
                 # Clean up task
+                $taskExitCode = if ($taskInfo) { $taskInfo.LastTaskResult } else { $null }
                 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
                 
                 # Check if installation succeeded by querying winget again
                 Start-Sleep -Seconds 2
-                $checkAfterInstall = winget list --id $app.Id 2>&1 | Out-String
-                
-                if ($checkAfterInstall -match $app.Id) {
+                if (Test-WingetPackageInstalled -Id $app.Id) {
                     Write-Host "  [OK] $($app.Name) installed successfully" -ForegroundColor Green
                     $installResults += @{ Name = $app.Name; Status = "Installed"; Success = $true }
                 }
                 else {
-                    Write-Host "  [FAILED] $($app.Name) installation failed" -ForegroundColor Red
+                    Write-Host "  [FAILED] $($app.Name) installation failed (task result: $taskExitCode)" -ForegroundColor Red
                     $installResults += @{ Name = $app.Name; Status = "Failed"; Success = $false }
                 }
             }
             else {
                 # Normal elevated installation
-                $process = Start-Process -FilePath "winget" -ArgumentList $installArgs -Wait -PassThru -NoNewWindow
+                $installExitCode = Invoke-Winget -Arguments $installArgs
                 
-                if ($process.ExitCode -eq 0) {
+                if ($installExitCode -eq 0) {
                     Write-Host "  [OK] $($app.Name) installed successfully" -ForegroundColor Green
                     $installResults += @{ Name = $app.Name; Status = "Installed"; Success = $true }
                 }
                 else {
-                    Write-Host "  [FAILED] $($app.Name) installation failed (Exit code: $($process.ExitCode))" -ForegroundColor Red
+                    Write-Host "  [FAILED] $($app.Name) installation failed (Exit code: $installExitCode)" -ForegroundColor Red
                     $installResults += @{ Name = $app.Name; Status = "Failed"; Success = $false }
                 }
             }
