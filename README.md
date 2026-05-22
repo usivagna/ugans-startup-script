@@ -53,6 +53,5 @@ Logs and registry backups are saved to the `output/` folder created next to the 
 
 ## Notes
 
-- Some Windows 11 settings (e.g., Widgets) may be protected by the system or MDM policies and could require manual adjustment via **Taskbar settings**.
 - Spotify requires a non-elevated install; the script handles this automatically via a scheduled task.
 - Restart your computer after the script finishes to ensure all changes take effect.

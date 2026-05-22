@@ -141,6 +141,7 @@ Write-Host "Applying registry settings:" -ForegroundColor Gray
 
 # Helper function to set registry value
 function Set-RegistryValue {
+    [CmdletBinding()]
     param(
         [string]$Path,
         [string]$Name,
@@ -163,7 +164,7 @@ function Set-RegistryValue {
         }
         catch [System.UnauthorizedAccessException] {
             # If access denied, try using reg.exe command instead
-            $regPath = $Path -replace "HKCU:\\", "HKCU\"
+            $regPath = $Path -replace '^(HKCU|HKLM):\\', '$1\'
             $valueType = switch ($Type) {
                 "DWord" { "REG_DWORD" }
                 "String" { "REG_SZ" }
@@ -224,13 +225,18 @@ catch {
     }
 }
 
+# Disable Widgets via machine-level Group Policy (most reliable, cannot be overridden by Windows)
+# This is the primary fix for Windows 11 22H2+ where TaskbarDa alone may be reset by Explorer
+$widgetsResult2 = Set-RegistryValue -Path "HKLM:\SOFTWARE\Policies\Microsoft\Dsh" `
+    -Name "AllowNewsAndInterests" -Value 0 -Description "Disable Widgets via Group Policy (machine-level)"
+
 # Also disable via Shell Feeds - ensure key exists
 $feedsPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Feeds"
 if (-not (Test-Path $feedsPath)) {
     New-Item -Path $feedsPath -Force | Out-Null
     Write-Host "  [INFO] Created Feeds registry key" -ForegroundColor Gray
 }
-$widgetsResult2 = Set-RegistryValue -Path $feedsPath `
+$widgetsResult3 = Set-RegistryValue -Path $feedsPath `
     -Name "IsFeedsAvailable" -Value 0 -Description "Disable Feeds Availability"
 
 # Hide Search Box from Taskbar
@@ -245,18 +251,13 @@ Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explore
 if (-not (Test-Path $feedsPath)) {
     New-Item -Path $feedsPath -Force | Out-Null
 }
-$widgetsResult3 = Set-RegistryValue -Path $feedsPath `
+$widgetsResult4 = Set-RegistryValue -Path $feedsPath `
     -Name "ShellFeedsTaskbarViewMode" -Value 2 -Description "Disable Feed in Widgets Panel"
 
 # If widgets registry keys failed, inform user of manual steps
-if (-not ($widgetsResult1 -and $widgetsResult2 -and $widgetsResult3)) {
+if (-not ($widgetsResult1 -and $widgetsResult2)) {
     Write-Host ""
-    Write-Host "  [WARNING] Some widgets settings may be protected by Windows 11." -ForegroundColor Yellow
-    Write-Host "  [INFO] Why this happens:" -ForegroundColor Yellow
-    Write-Host "        - Windows 11 may revert the TaskbarDa value after Explorer restart" -ForegroundColor Gray
-    Write-Host "        - Some registry keys are protected by TrustedInstaller" -ForegroundColor Gray
-    Write-Host "        - Group Policy or MDM settings may override user preferences" -ForegroundColor Gray
-    Write-Host ""
+    Write-Host "  [WARNING] Some widgets settings may not have applied." -ForegroundColor Yellow
     Write-Host "  [INFO] To manually disable widgets:" -ForegroundColor Yellow
     Write-Host "        1. Right-click on the taskbar" -ForegroundColor Gray
     Write-Host "        2. Select 'Taskbar settings'" -ForegroundColor Gray
