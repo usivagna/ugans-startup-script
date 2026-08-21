@@ -4,10 +4,11 @@
 #
 # Configures Windows 11 settings including taskbar customization, dark theme,
 # Windows Spotlight, uninstalls the Windows Web Experience Pack (Widgets), and
-# installs essential developer software (Microsoft 365,
-# VSCode, Git, Node.js (includes npm and npx), PowerToys, Logi Options+,
-# Spotify, GitHub Copilot CLI, Claude Code, Microsoft Foundry Local, Handy)
-# using winget.
+# installs essential developer software (Microsoft 365, VSCode, Git, GitHub CLI,
+# GitHub Copilot app and CLI, Windows App, Node.js (includes npm and npx),
+# Python, PowerToys, Logi Options+, Spotify, Claude Code, Microsoft Foundry
+# Local, Handy, PowerShell 7, Azure CLI) using winget, plus the Azure DevOps
+# CLI extension through Azure CLI.
 #
 # PARAMETER CreateRestorePoint
 #   Optional. Creates a system restore point before making changes.
@@ -308,6 +309,15 @@ Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\CloudEx
 Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
     -Name "DesktopSlideShow" -Value 0 -Description "Disable Slideshow for Spotlight"
 
+# Set Windows Terminal as the default terminal host
+Set-RegistryValue -Path "HKCU:\Console\%%Startup" `
+    -Name "DelegationConsole" -Value "{2EACA947-7F5F-4CFA-BA87-8F7FBEEFBE69}" -Type String `
+    -Description "Set Windows Terminal as Default Console Host"
+
+Set-RegistryValue -Path "HKCU:\Console\%%Startup" `
+    -Name "DelegationTerminal" -Value "{E12CFF52-A866-4C77-9A90-F570A7AA2C6B}" -Type String `
+    -Description "Set Windows Terminal as Default Terminal Application"
+
 # Set Dark Theme for Apps
 Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" `
     -Name "AppsUseLightTheme" -Value 0 -Description "Set Dark Theme for Apps"
@@ -407,6 +417,11 @@ $software = @(
         Scope = "user"
     },
     @{
+        Name = "GitHub CLI"
+        Id = "GitHub.cli"
+        Scope = "user"
+    },
+    @{
         Name = "Node.js LTS (includes npm and npx)"
         Id = "OpenJS.NodeJS.LTS"
         Scope = "user"
@@ -439,6 +454,16 @@ $software = @(
         Scope = "user"
     },
     @{
+        Name = "GitHub Copilot app"
+        Id = "GitHub.CopilotApp"
+        Scope = "user"
+    },
+    @{
+        Name = "Windows App"
+        Id = "Microsoft.WindowsApp"
+        Scope = "user"
+    },
+    @{
         Name = "Claude Code"
         Id = "Anthropic.ClaudeCode"
         Scope = "user"
@@ -457,6 +482,11 @@ $software = @(
     @{
         Name = "PowerShell 7"
         Id = "Microsoft.PowerShell"
+        Scope = "machine"
+    },
+    @{
+        Name = "Azure CLI"
+        Id = "Microsoft.AzureCLI"
         Scope = "machine"
     }
 )
@@ -585,15 +615,39 @@ foreach ($app in $software) {
     Write-Host ""
 }
 
-# Check for Windows App (verification only)
-Write-Host "Checking Windows App..." -ForegroundColor Gray
-$windowsAppCheck = winget list --id "9WZDNCRFJ3PS" 2>&1 | Out-String
+# Refresh PATH so a newly installed Azure CLI is available in this process
+$machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+$env:Path = @($machinePath, $userPath, $env:Path) -join ";"
 
-if ($windowsAppCheck -match "9WZDNCRFJ3PS" -or $windowsAppCheck -match "Windows App") {
-    Write-Host "  [OK] Windows App is present" -ForegroundColor Green
+Write-Host "Checking Azure DevOps CLI extension..." -ForegroundColor Gray
+$azCommand = Get-Command az -ErrorAction SilentlyContinue
+if ($azCommand) {
+    $extensionListOutput = (& $azCommand.Source extension list --query "[?name=='azure-devops'].name" -o tsv 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [FAILED] Could not query Azure CLI extensions: $extensionListOutput" -ForegroundColor Red
+        $installResults += @{ Name = "Azure DevOps CLI extension"; Status = "Extension query failed"; Success = $false }
+    }
+    elseif ($extensionListOutput -eq "azure-devops") {
+        Write-Host "  [OK] Azure DevOps CLI extension is already installed" -ForegroundColor Green
+        $installResults += @{ Name = "Azure DevOps CLI extension"; Status = "Already Installed"; Success = $true }
+    }
+    else {
+        Write-Host "  [INFO] Installing Azure DevOps CLI extension..." -ForegroundColor Yellow
+        $extensionInstallOutput = (& $azCommand.Source extension add --name azure-devops --yes 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [OK] Azure DevOps CLI extension installed successfully" -ForegroundColor Green
+            $installResults += @{ Name = "Azure DevOps CLI extension"; Status = "Installed"; Success = $true }
+        }
+        else {
+            Write-Host "  [FAILED] Azure DevOps CLI extension installation failed: $extensionInstallOutput" -ForegroundColor Red
+            $installResults += @{ Name = "Azure DevOps CLI extension"; Status = "Installation failed"; Success = $false }
+        }
+    }
 }
 else {
-    Write-Host "  [WARNING] Windows App not detected (may need manual installation from Microsoft Store)" -ForegroundColor Yellow
+    Write-Host "  [SKIPPED] Azure CLI is unavailable after PATH refresh" -ForegroundColor Yellow
+    $installResults += @{ Name = "Azure DevOps CLI extension"; Status = "Skipped - Azure CLI unavailable"; Success = $null }
 }
 
 Write-Host ""
@@ -613,11 +667,15 @@ Write-Host "  [OK] Clock/Date hidden from taskbar (visible in Action Center)" -F
 Write-Host "  [OK] Taskbar apps unpinned" -ForegroundColor Green
 Write-Host "  [OK] Dark theme enabled" -ForegroundColor Green
 Write-Host "  [OK] Windows Spotlight enabled" -ForegroundColor Green
+Write-Host "  [OK] Windows Terminal set as the default terminal host" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "Software Installation Status:" -ForegroundColor Cyan
 foreach ($result in $installResults) {
-    if ($result.Success) {
+    if ($null -eq $result.Success) {
+        Write-Host "  [SKIPPED] $($result.Name): $($result.Status)" -ForegroundColor Yellow
+    }
+    elseif ($result.Success) {
         Write-Host "  [OK] $($result.Name): $($result.Status)" -ForegroundColor Green
     }
     else {

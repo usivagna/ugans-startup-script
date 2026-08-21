@@ -10,6 +10,7 @@ Automated Windows 11 developer PC setup script that configures system settings a
 - Unpins all default taskbar apps
 - Enables Dark Theme for apps and system UI
 - Enables Windows Spotlight on the lock screen and desktop
+- Sets Windows Terminal as the default terminal host
 
 ### Software Installed via Winget
 | App | Winget ID |
@@ -17,16 +18,24 @@ Automated Windows 11 developer PC setup script that configures system settings a
 | Microsoft 365 | `Microsoft.Office` |
 | Visual Studio Code | `Microsoft.VisualStudioCode` |
 | Git | `Git.Git` |
+| GitHub CLI | `GitHub.cli` |
 | Node.js LTS (includes npm and npx) | `OpenJS.NodeJS.LTS` |
 | Python 3 (latest stable) | `Python.Python.3.13` |
 | PowerToys | `Microsoft.PowerToys` |
 | Logi Options+ | `Logitech.OptionsPlus` |
 | Spotify | `Spotify.Spotify` |
 | GitHub Copilot CLI | `GitHub.Copilot` |
+| GitHub Copilot app | `GitHub.CopilotApp` |
+| Windows App | `Microsoft.WindowsApp` |
 | Claude Code | `Anthropic.ClaudeCode` |
 | Microsoft Foundry Local | `Microsoft.FoundryLocal` |
 | Handy | `cjpais.Handy` |
 | PowerShell 7 | `Microsoft.PowerShell` |
+| Azure CLI | `Microsoft.AzureCLI` |
+
+### Additional CLI Extension
+
+After Azure CLI is available, the script idempotently installs the public Azure DevOps CLI extension through Azure CLI (not Winget).
 
 ## Requirements
 
